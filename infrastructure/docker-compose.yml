@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: todo_postgres
+    restart: unless-stopped
+    ports:
+      - '5435:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todo_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d todo_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  be:
+    build:
+      context: ../be
+      dockerfile: ../infrastructure/docker/be.Dockerfile
+    container_name: todo_be
+    restart: unless-stopped
+    ports:
+      - '5001:5000'
+    env_file:
+      - ../be/.env
+    environment:
+      DB_HOST: postgres
+    volumes:
+      - ../be:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  fe:
+    build:
+      context: ../fe
+      dockerfile: ../infrastructure/docker/fe.Dockerfile
+    container_name: todo_fe
+    restart: unless-stopped
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_URL: http://localhost:5001/api
+      CHOKIDAR_USEPOLLING: 'true'
+    volumes:
+      - ../fe:/app
+      - /app/node_modules
+    depends_on:
+      - be
+
+volumes:
+  pgdata:

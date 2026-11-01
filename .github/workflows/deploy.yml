@@ -1,0 +1,32 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: SSH + pull + rebuild
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /root/fullstack-todo-list
+            echo "==> git pull"
+            git pull origin main
+            echo "==> docker compose up --build"
+            cd infrastructure
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+            echo "==> prune old images"
+            docker image prune -f
+            echo "==> done"
+            docker compose -f docker-compose.prod.yml --env-file .env.prod ps
